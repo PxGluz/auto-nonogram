@@ -1,12 +1,11 @@
+import numpy as np
 import itertools as it
 import re
 from typing import List, Dict, Tuple, Set, AnyStr, Type
-import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-from utlis import *
 
 solution_list: List[Type[np.ndarray]] = []
 placements: Dict[str, Dict[int, List[Type[np.ndarray]]]] = {}
+
 
 def compute_blocks(line_len: int, blocks: Tuple):
     """
@@ -274,146 +273,80 @@ def backtrack(solution_array: Type[np.ndarray], row_placements: Dict[int, List[T
             backtrack(solution_array, row_placements_next, row_args, col_args, completed_rows_next, completed_cols_next)
             line[:] = line_copy.copy()
 
-if __name__ == "__main__":
-    print('Setting UP')
 
-    ########################################################################
-    pathImage = "Resources/1.jpg"
-    heightImg = 450
-    widthImg = 450
-    # model = intializePredectionModel()  # LOAD THE CNN MODEL
-    ########################################################################
+# if __name__ == "__main__":
+#     # Easy case 1
+#     # row_args = [(1, ), (2, )]
+#     # col_args = [(2, ), (1, )]
+    
+#     # Easy case 2 - non-unique
+#     # row_args = [(1,), (2,)]
+#     # col_args = [(1, ), (1, ), (1, )]
+    
+#     # Medium case 1
+#     # row_args = [(2,), (2,), (1,), (1, 1,), (3,)]
+#     # col_args = [(1,), (2, 1,), (2, 2,), (1, 1,)]
+    
+#     # Medium case 2
+#     # row_args = [
+#     #     (5,), (1, 3,), (6,), (2, 5,), (3, 4,),
+#     #     (3, 7,), (3, 10,), (3, 11,), (5, 7,), (5, 5,),
+#     #     (5, 6,), (13,), (9,), (1, 1,), (2, 1, 4,)
+#     # ]
+#     # col_args = [
+#     #     (6,), (8,), (9,), (4,), (6,),
+#     #     (2, 5,), (1, 1, 3, 2, 1,), (8, 2,), (1, 7, 2, 1,), (9, 3,),
+#     #     (13, 1,), (3, 8, 1,), (8, 1,), (9,), (5,)
+#     # ]
+    
+#     # Hard case 1
+#     # row_args = [
+#     #     (3, 2, 3, ), (3, 1, 1, 1, 3, ), (1, 5, 2, 1, ), (4, 6, 1, ), (3, 6, ),
+#     #     (1, 4, 7, ), (4, 2, 2, 6, ), (3, 5, ), (2, 1, 3, ), (7, ),
+#     #     (3, 4, 2, ), (1, 2, 3, 4, ), (5, 2, 2, ), (4, 1, 4, ), (5, 5, 1, ),
+#     #     (5, 5, ), (2, 1, 6, ), (1, 2, 2, 7, ), (2, 2, 1, 8, ), (7, 1, 7, )
+#     # ]
+#     # col_args = [
+#     #     (3, 4, 1, 3, ), (2, 3, 2, ), (3, 2, 1, ), (1, 1, 1, 7, ), (4, 8, ),
+#     #     (3, 1, 4, 1, ), (4, 1, 4, 1, ), (1, 1, 3, 2, ), (2, 1, 3, 4, ), (1, 2, 1, 1, ),
+#     #     (2, 2, ), (2, 1, 2, ), (4, 3, 4, ), (4, 1, 11, ), (4, 3, 6, ),
+#     #     (5, 2, 6, ), (5, 1, 1, 7, ), (8, 6, ), (10, 1, ), (8, 4, )
+#     # ]
 
-
-    #### 1. PREPARE THE IMAGE
-    img = cv2.imread(pathImage)
-    img = cv2.resize(img, (widthImg, heightImg))  # RESIZE IMAGE TO MAKE IT A SQUARE IMAGE
-    imgBlank = np.zeros((heightImg, widthImg, 3), np.uint8)  # CREATE A BLANK IMAGE FOR TESTING DEBUGING IF REQUIRED
-    imgThreshold = preProcess(img, cv2.THRESH_BINARY_INV)
-
-    # #### 2. FIND ALL COUNTOURS
-    imgContours = img.copy() # COPY IMAGE FOR DISPLAY PURPOSES
-    imgBigContour = img.copy() # COPY IMAGE FOR DISPLAY PURPOSES
-    contours, hierarchy = cv2.findContours(imgThreshold, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE) # FIND ALL CONTOURS
-    cv2.drawContours(imgContours, contours, -1, (0, 255, 0), 3) # DRAW ALL DETECTED CONTOURS
-
-    #### 3. FIND THE BIGGEST COUNTOUR AND USE IT AS SUDOKU
-    biggest, maxArea = biggestContour(contours) # FIND THE BIGGEST CONTOUR
-    print(biggest)
-    if biggest.size != 0:
-        biggest = reorder(biggest)
-        print(biggest)
-        cv2.drawContours(imgBigContour, biggest, -1, (0, 0, 255), 25) # DRAW THE BIGGEST CONTOUR
-        pts1 = np.float32(biggest) # PREPARE POINTS FOR WARP
-        pts2 = np.float32([[0, 0],[widthImg, 0], [0, heightImg],[widthImg, heightImg]]) # PREPARE POINTS FOR WARP
-        matrix = cv2.getPerspectiveTransform(pts1, pts2) # GER
-        imgWarpColored = cv2.warpPerspective(img, matrix, (widthImg, heightImg))
-        imgDetectedDigits = imgBlank.copy()
-        # imgWarpColored = cv2.cvtColor(imgWarpColored,cv2.COLOR_BGR2GRAY)
-        thresholdPuzzle = preProcess(imgWarpColored, cv2.THRESH_BINARY_INV)
-        boxWidth, boxHeight, borderDimX, borderDimY = findSizes(thresholdPuzzle, widthImg, heightImg)
-        matrixWidth = round((widthImg - 2 * borderDimX) / boxWidth)
-        matrixHeight = round((heightImg - 2 * borderDimY) / boxHeight)
-
-        print(matrixWidth, matrixHeight)
-
-        imgSolvedDigits = imgBlank.copy()
-
-        boxes = splitBoxes(preProcess(imgWarpColored, cv2.THRESH_BINARY), matrixHeight, matrixWidth, widthImg, heightImg)
-        print(len(boxes))
-        # cv2.imshow("Sample",boxes[5])
-        numbers = getPredection(boxes)
-        numbers = np.reshape(numbers, (matrixHeight, matrixWidth))
-        print(numbers)
-        #solveNonogram(numbers, matrixWidth, matrixHeight)
-        i = matrixHeight - 1
-        j = matrixWidth - 1
-        nonogramHeight = 0
-        nonogramWidth = 0
-        while numbers[i][j] == '':
-            nonogramHeight += 1
-            i -= 1
-
-        i = matrixHeight - 1
-        while numbers[i][j] == '':
-            nonogramWidth += 1
-            j -= 1
-
-        i = matrixHeight - nonogramHeight
-        row_args = []
-        while i < matrixHeight:
-            row = []
-            for j in range(matrixWidth - nonogramWidth):
-                if numbers[i][j] != '':
-                    row.append(int(numbers[i][j]))
-            row_args.append(tuple(row))
-            i += 1
-
-        j = matrixWidth - nonogramWidth
-        col_args = []
-        while j < matrixWidth:
-            col = []
-            for i in range(matrixHeight - nonogramHeight):
-                if numbers[i][j] != '':
-                    col.append(int(numbers[i][j]))
-            col_args.append(tuple(col))
-            j += 1
-
-        print(row_args)
-        print(col_args)
-
-        row_vector_len = len(col_args)
-        col_vector_len = len(row_args)
-        placements['row'] = {}
-        for i, arg in enumerate(row_args):
-            blocks = compute_blocks(row_vector_len, arg)
-            placements['row'][i] = enumerate_blocks(blocks, arg, row_vector_len)
-        placements['column'] = {}
-        for i, arg in enumerate(col_args):
-            blocks = compute_blocks(col_vector_len, arg)
-            placements['column'][i] = enumerate_blocks(blocks, arg, col_vector_len)
-        
-        # Infer values
-        partial_solution = -1 * np.ones((col_vector_len, row_vector_len), dtype=np.int8)
-        completed_rows = set()
-        completed_columns = set()
-        updated = True
-        while updated:
-            infer_values(partial_solution, placements)
-            completed_rows, completed_columns = update_completions(partial_solution)
-            updated, placements = update_placements(partial_solution, placements.copy(), completed_rows, completed_columns)
-        
-        assert (len(placements['row']) == 0 and len(placements['column']) == 0) or \
-               (len(placements['row']) != 0 and len(placements['column']) != 0)
-        
-        if len(placements['row']) == 0:
-            solution_list.append(partial_solution)
-        else:
-            # Backtrack through the rest of the unsolved rows
-            print('Solving via backtracking')
-            backtrack(partial_solution, placements['row'], row_args, col_args, completed_rows, completed_columns)
-        
-        print(matrixWidth, " ", matrixHeight)
-        print(nonogramWidth, " ", nonogramHeight)
-        for solution in solution_list:
-            print(solution)
-            for i in range(matrixHeight):
-                line = ""
-                for j in range(matrixWidth):
-                    if numbers[i][j] != '':
-                        line += numbers[i][j]
-                    else:
-                        if i < matrixHeight - nonogramHeight or j < matrixWidth - nonogramWidth:
-                            line += " "
-                        elif solution[i - matrixHeight + nonogramHeight][j - matrixWidth + nonogramWidth] == 0:
-                            line += " "
-                        else:
-                            line += "#"
-                print(line)
-
-    imageArray = ([img,imgThreshold,imgContours, imgBigContour],
-                    [imgWarpColored, thresholdPuzzle,imgBlank,imgBlank])
-    stackedImage = stackImages(imageArray, 1)
-    cv2.imshow('Threshold Puzzle', thresholdPuzzle)
-    cv2.imshow('Steps', stackedImage)
-    cv2.waitKey(0)
+#     row_args = [(1, 1, ), (2, 2, ), (2, 2, ), (3, 3, ), (3, 9, 3, ), (19, ), (3, 9, 3, ), (9, ), (11, ), (3, 3, 3, ), (13, ), (2, 2, ), (1, 1, 1, 1, ), (2, 2, ), (2, 2, ), (9, ), (5, )]
+#     col_args = [(1, ), (3, ), (3, ), (3, 4, ), (2, 1, 4, 2, ), (10, 2, ), (2, 8, 1, 1, ), (5, 1, 2, ), (7, 2, ), (7, 2, ), (7, 2, ), (5, 1, 2, ), (2, 8, 1, 1, ), (10, 2, ), (2, 1, 4, 2, ), (3, 4, ), (3, ), (3, ), (1, )]
+    
+#     # Generate possibilities for each row and column
+#     row_vector_len = len(col_args)
+#     col_vector_len = len(row_args)
+#     placements['row'] = {}
+#     for i, arg in enumerate(row_args):
+#         blocks = compute_blocks(row_vector_len, arg)
+#         placements['row'][i] = enumerate_blocks(blocks, arg, row_vector_len)
+#     placements['column'] = {}
+#     for i, arg in enumerate(col_args):
+#         blocks = compute_blocks(col_vector_len, arg)
+#         placements['column'][i] = enumerate_blocks(blocks, arg, col_vector_len)
+    
+#     # Infer values
+#     partial_solution = -1 * np.ones((col_vector_len, row_vector_len), dtype=np.int8)
+#     completed_rows = set()
+#     completed_columns = set()
+#     updated = True
+#     while updated:
+#         infer_values(partial_solution, placements)
+#         completed_rows, completed_columns = update_completions(partial_solution)
+#         updated, placements = update_placements(partial_solution, placements.copy(), completed_rows, completed_columns)
+    
+#     assert (len(placements['row']) == 0 and len(placements['column']) == 0) or \
+#            (len(placements['row']) != 0 and len(placements['column']) != 0)
+    
+#     if len(placements['row']) == 0:
+#         solution_list.append(partial_solution)
+#     else:
+#         # Backtrack through the rest of the unsolved rows
+#         print('Solving via backtracking')
+#         backtrack(partial_solution, placements['row'], row_args, col_args, completed_rows, completed_columns)
+    
+#     for solution in solution_list:
+#         print(solution)

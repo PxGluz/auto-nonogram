@@ -1,21 +1,21 @@
 import cv2
 import numpy as np
-from tensorflow.keras.models import load_model
+#from tensorflow.keras.models import load_model
 import pytesseract
 from PIL import Image
 import math
-
-#### READ THE MODEL WEIGHTS
-def intializePredectionModel():
-    model = load_model('Resources/myModel.h5')
-    return model
-
+import easyocr
+from paddleocr import PaddleOCR
 
 #### 1 - Preprocessing Image
-def preProcess(img):
+def preProcess(img, thresh):
     imgGray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # CONVERT IMAGE TO GRAY SCALE
-    imgBlur = cv2.GaussianBlur(imgGray, (5, 5), 1)  # ADD GAUSSIAN BLUR
-    imgThreshold = cv2.adaptiveThreshold(imgBlur, 255, 1, 1, 11, 2)  # APPLY ADAPTIVE THRESHOLD
+    imgBlur = cv2.GaussianBlur(imgGray, (5, 5), 2)  # ADD GAUSSIAN BLUR
+    img_bilateral = cv2.bilateralFilter(imgBlur, 5, 75, 50)
+    clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
+    img_clahe = clahe.apply(img_bilateral)
+    img_bilateral = cv2.bilateralFilter(img_clahe, 5, 75, 50)
+    imgThreshold = cv2.adaptiveThreshold(img_bilateral, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, thresh, 11, 2)  # APPLY ADAPTIVE THRESHOLD
     return imgThreshold
 
 
@@ -77,16 +77,39 @@ def splitBoxes(img, height, width, widthImg, heightImg):
     img = cv2.resize(img, (math.floor(widthImg / width) * width, math.floor(heightImg / height) * height))  # RESIZE IMAGE TO MAKE IT A SQUARE IMAGE
     rows = np.vsplit(img,height)
     boxes=[]
+    i = 0
     for r in rows:
         cols= np.hsplit(r,width)
         for box in cols:
-            boxes.append(box)
+            clnBox = cleanBox(box, 255, 20)
+            box_gauss = cv2.GaussianBlur(clnBox, (5, 5), 1)
+            #box_bilateral = cv2.bilateralFilter(box_gauss, 5, 75, 25)
+            boxes.append(box_gauss)
+            #cv2.imshow("Box " + str(i), box_bilateral)
+            i = i + 1
     return boxes
 
+def cleanBox(box, cleanValue, percentage):
+    sizeX, sizeY = box.shape
+    sizeXs = sizeX * percentage // 100
+    sizeYs = sizeY * percentage // 100
+    for i in range(sizeXs):
+        for j in range(sizeY):
+            box[i][j] = cleanValue
+            box[-i][j] = cleanValue
+
+    for j in range(sizeYs):
+        for i in range(sizeX):
+            box[i][j] = cleanValue
+            box[i][-j] = cleanValue
+
+    return box
 
 #### 4 - GET PREDECTIONS ON ALL IMAGES
 def getPredection(boxes):
     result = []
+    reader = easyocr.Reader(['en'])
+    # ocr = PaddleOCR(use_angle_cls=True, lang='en')
     for image in boxes:
         ## PREPARE IMAGE
         # img = np.asarray(image)
@@ -96,19 +119,26 @@ def getPredection(boxes):
         # img = img.reshape(1, 28, 28, 1)
         ## GET PREDICTION
         im_pil = Image.fromarray(image)
-        prediction = pytesseract.image_to_string(im_pil, lang='eng',config='--psm 9 --oem 3 -c tessedit_char_whitelist=0123456789')
-        # probabilityValue = np.amax(predictions)
+        prediction = pytesseract.image_to_string(im_pil, lang='eng',config='--psm 10 --oem 3 -c tessedit_char_whitelist=0123456789')
+        # results = ocr.ocr(image)
+        # results = reader.readtext(image, allowlist='0123456789')
+        # if len(results) > 0:
+        #     #prediction, _ = results[0][1][0]
+        #     _, prediction, _ = results[0]
+        # else:
+        #     prediction = ' '
+        #probabilityValue = np.amax(predictions)
+
         ## SAVE TO RESULT
         
         if prediction == "":
             prediction = " "
-        result.append(prediction.replace("\n", ""))
+        result.append(prediction.replace("\n", "").replace("\x0c", ""))
         # if probabilityValue > 0.8:
         #     result.append(classIndex[0])
         # else:
         #     result.append(-1)
     return result
-
 
 #### 6 -  TO DISPLAY THE SOLUTION ON THE IMAGE
 def displayNumbers(img,numbers,color = (0,255,0)):
